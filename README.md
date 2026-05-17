@@ -1,5 +1,8 @@
 # Mauswag RecordSync: Crop Management Module
 
+WEB APPLICATION LINK:  https://teresia-aprioristic-unspasmodically.ngrok-free.dev/
+- MIGHT NOT BE WORKING IF MY LAPTOP IS TURNED OFF BECAUSE MY LAPTOP ACTS AS THE SERVER OF THE WEB APPLICATION
+
 ## Project Overview
 Mauswag RecordSync is a specialized module for the AgriSync ecosystem designed to digitize farm operations. It bridges the gap between field assistants and managers by providing a real-time platform for crop lifecycle tracking.
 
