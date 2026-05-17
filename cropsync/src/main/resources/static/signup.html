@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - CropTrack</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #76b852; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: white; padding: 40px; border-radius: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 85%; max-width: 350px; text-align: center; }
+        h2 { color: #2e7d32; margin-bottom: 30px; }
+        input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; font-size: 16px; }
+        .btn-signup { background: #1976d2; color: white; border: none; width: 100%; padding: 15px; border-radius: 15px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .link { display: block; margin-top: 20px; color: #666; text-decoration: none; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2>Mauswag Sign Up</h2>
+    <input type="text" id="username" placeholder="Choose Username">
+    <input type="password" id="password" placeholder="Choose Password">
+    <button class="btn-signup" onclick="handleSignup()">Register Account</button>
+    <a href="login.html" class="link">May account na? Login dito.</a>
+</div>
+
+<script>
+    const BASE_URL = "https://teresia-aprioristic-unspasmodically.ngrok-free.dev";
+
+    async function handleSignup() {
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+
+        if (!user || !pass) return alert("Paki-fill up lahat!");
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/auth/signup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+
+            if (res.ok) {
+                alert("Success! Pwede ka na mag-login.");
+                window.location.href = "login.html";
+            } else {
+                const errorText = await res.text();
+                alert(errorText); // Lalabas dito kung "Username already exists!"
+            }
+        } catch (err) {
+            alert("Server connection error.");
+        }
+    }
+</script>
+</body>
+</html>

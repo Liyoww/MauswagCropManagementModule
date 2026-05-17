@@ -1,0 +1,18 @@
+{
+  "short_name": "RecordSync",
+  "name": "Mauswag RecordSync",
+  "description": "Farm Management and Crop Planning App",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2375/2375263.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/login.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9f9f9",
+  "theme_color": "#76b852"
+}

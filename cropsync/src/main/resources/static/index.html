@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CropTrack</title>
+    
+    <style>
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #76b852; color: white; overflow-x: hidden; }
+        .header { padding: 15px; text-align: center; }
+        .main-content { background: #f9f9f9; color: #333; min-height: 90vh; border-radius: 30px 30px 0 0; padding: 15px; padding-bottom: 100px; box-sizing: border-box; }
+        
+        /* Controls */
+        .controls-container { background: white; padding: 10px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+        #searchInput { flex: 2; min-width: 0; padding: 10px; border: 1px solid #eee; border-radius: 10px; font-size: 13px; background: #fafafa; }
+        .btn-action { flex: 1; border: none; padding: 10px 5px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 11px; color: white; text-align: center; white-space: nowrap; }
+        .bg-green { background: #4CAF50; }
+        .bg-blue { background: #1976d2; }
+
+        /* Grid & Cards */
+        .crop-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .crop-card, .inventory-card { background: white; border-radius: 20px; padding: 12px; position: relative; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.05); cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+        .crop-icon-placeholder { width: 45px; height: 45px; background: #e8f5e9; border-radius: 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; color: #4CAF50; font-weight: bold; font-size: 18px; }
+        .delete-btn { position: absolute; top: 5px; right: 5px; background: #ffeded; color: #ff4444; border: none; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 16px; z-index: 10; }
+
+        /* Navigation */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 1000; }
+        .nav-item { color: #888; text-decoration: none; font-size: 12px; text-align: center; cursor: pointer; flex: 1; }
+        .nav-item.active { color: #2e7d32; font-weight: bold; }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; width: 90%; max-width: 380px; padding: 20px; border-radius: 25px; color: #333; max-height: 80vh; overflow-y: auto; }
+        
+        /* Utility */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="header"><h3>Crop Track</h3></div>
+
+    <div class="main-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <p style="margin:0; font-size: 14px;"><strong id="sectionTitle">Active Crops</strong></p>
+            <button onclick="logout()" style="border: 1px solid #ddd; background: white; padding: 5px 12px; border-radius: 15px; color: #888; font-size: 11px;">Logout</button>
+        </div>
+
+        <div class="controls-container" id="filterSection">
+            <input type="text" id="searchInput" placeholder="Search..." onkeyup="filterCrops()">
+            <button class="btn-action bg-green" onclick="openCropModal()">+ Planner</button>
+            <button class="btn-action bg-blue" onclick="openTemplateModal()">+ Type</button>
+        </div>
+
+        <div id="cropsView">
+            <div class="crop-grid" id="cropGrid"></div>
+        </div>
+
+        <div id="inventoryView" class="hidden">
+    <div id="inventoryList" style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px;">
+        <p style="text-align:center; padding:20px; color:#888;">Loading supplies...</p>
+    </div>
+    <button class="btn-action bg-blue" 
+            style="width: 100%; margin-top: 20px; padding: 15px; border-radius:15px; position: relative; z-index: 10;" 
+            onclick="openSupplyModal()">
+        + Add New Supply
+    </button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="cropModal">
+        <div class="modal-content">
+            <div style="font-weight: bold; margin-bottom: 15px; text-align: center;">New Crop Planner</div>
+            <select id="cropType" style="width:100%; padding:12px; border-radius:12px; border:1px solid #eee; margin-bottom:10px;">
+                <option value="">Loading types...</option>
+            </select>
+            <input type="number" id="quantity" placeholder="Quantity" style="width:100%; padding:12px; border-radius:12px; border:1px solid #eee; margin-bottom:10px;">
+            <input type="date" id="datePlanted" style="width:100%; padding:12px; border-radius:12px; border:1px solid #eee; margin-bottom:15px;">
+            <div style="display: flex; gap: 10px;">
+                <button style="flex:1; padding: 12px; border-radius: 12px; border:none; background:#eee;" onclick="closeModals()">Cancel</button>
+                <button style="flex:1; padding: 12px; border-radius: 12px; border:none; background:#4CAF50; color:white;" onclick="saveCrop()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="templateModal">
+        <div class="modal-content">
+            <div style="font-weight: bold; margin-bottom: 15px; text-align: center;">New Crop Template</div>
+            <input type="text" id="newCropTypeName" placeholder="Crop Name (e.g. Chili)" style="width:100%; padding:12px; border-radius:12px; border:1px solid #eee; margin-bottom:10px;">
+            <div id="taskInputsContainer">
+                <div class="task-row" style="display: flex; gap: 5px; margin-bottom: 8px;">
+                    <input type="number" placeholder="Day" style="width: 60px; padding:8px; border-radius:8px; border:1px solid #eee;">
+                    <input type="text" placeholder="Task description" style="flex: 1; padding:8px; border-radius:8px; border:1px solid #eee;">
+                </div>
+            </div>
+            <button style="width:100%; background:none; border:1px dashed #1976d2; color:#1976d2; padding:8px; border-radius:10px; font-size:12px; margin-bottom:20px;" onclick="addTaskRow()">+ Add Task Row</button>
+            <div style="display: flex; gap: 10px;">
+                <button style="flex:1; padding: 12px; border-radius: 12px; border:none; background:#eee;" onclick="closeModals()">Cancel</button>
+                <button style="flex:1; padding: 12px; border-radius: 12px; border:none; background:#1976d2; color:white;" onclick="saveNewTemplate()">Save Type</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="supplyModal">
+        <div class="modal-content">
+            <div style="font-weight: bold; margin-bottom: 15px; text-align: center;">Add New Supply</div>
+            <input type="text" id="supplyBrand" placeholder="Brand Name (e.g. YaraMila)" style="width:100%; padding:12px; border-radius:12px; border:1px solid #eee; margin-bottom:10px;">
+            <select id="supplyCategory" style="width:100%; padding:12px; border-radius:12px; border:1px solid #eee; margin-bottom:10px;">
+                <option value="Fertilizer">Fertilizer</option>
+                <option value="Pesticide">Pesticide</option>
+                <option value="Seeds">Seeds</option>
+                <option value="Tools">Tools</option>
+            </select>
+            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                <input type="number" id="supplyWeight" placeholder="Weight" style="flex:2; padding:12px; border-radius:12px; border:1px solid #eee;">
+                <input type="text" id="supplyUnit" placeholder="Unit (kg/L)" style="flex:1; padding:12px; border-radius:12px; border:1px solid #eee;">
+            </div>
+            <input type="number" id="supplyQty" placeholder="Stock Quantity" style="width:100%; padding:12px; border-radius:12px; border:1px solid #eee; margin-bottom:15px;">
+            <div style="display: flex; gap: 10px;">
+                <button style="flex:1; padding: 12px; border-radius: 12px; border:none; background:#eee;" onclick="closeModals()">Cancel</button>
+                <button style="flex:1; padding: 12px; border-radius: 12px; border:none; background:#1976d2; color:white;" onclick="saveSupply()">Save Supply</button>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="restockModal">
+    <div class="modal-content">
+        <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">Add Stock</div>
+        <div id="restockItemName" style="text-align: center; font-size: 13px; color: #666; margin-bottom: 15px;">Item Name</div>
+        
+        <label style="font-size: 11px; color: #888; display: block; margin-bottom: 5px;">How many units will you add?</label>
+        <input type="number" id="restockAmount" placeholder="0.00" style="width:100%; padding:12px; border-radius:12px; border:1px solid #eee; margin-bottom:15px;">
+        
+        <div style="display: flex; gap: 10px;">
+            <button style="flex:1; padding: 12px; border-radius: 12px; border:none; background:#eee;" onclick="closeModals()">Cancel</button>
+            <button style="flex:1; padding: 12px; border-radius: 12px; border:none; background:#4CAF50; color:white;" onclick="submitRestock()">Confirm</button>
+        </div>
+    </div>
+</div>
+    <nav class="bottom-nav">
+        <div id="navCrops" class="nav-item active" onclick="switchTab('crops')">
+            <div style="font-size: 20px;"></div>
+            Crops
+        </div>
+        <div id="navInventory" class="nav-item" onclick="switchTab('inventory')">
+            <div style="font-size: 20px;"></div>
+            Inventory
+        </div>
+    </nav>
+
+   <script>
+    const BASE_URL = "https://teresia-aprioristic-unspasmodically.ngrok-free.dev";
+    const loggedInUser = localStorage.getItem("username"); 
+
+    if (localStorage.getItem("isLoggedIn") !== "true") { window.location.href = "login.html"; }
+
+    function logout() { 
+        localStorage.clear();
+        window.location.href = "login.html"; 
+    }
+
+    // --- VIEW SWITCHING ---
+    function switchTab(tab) {
+        const cropsView = document.getElementById('cropsView');
+        const inventoryView = document.getElementById('inventoryView');
+        const filterSection = document.getElementById('filterSection');
+        const sectionTitle = document.getElementById('sectionTitle');
+        const navCrops = document.getElementById('navCrops');
+        const navInventory = document.getElementById('navInventory');
+
+        if (tab === 'crops') {
+            cropsView.classList.remove('hidden');
+            inventoryView.classList.add('hidden');
+            filterSection.classList.remove('hidden');
+            sectionTitle.innerText = "Active Crops";
+            navCrops.classList.add('active');
+            navInventory.classList.remove('active');
+            loadCrops();
+        } else {
+            cropsView.classList.add('hidden');
+            inventoryView.classList.remove('hidden');
+            filterSection.classList.add('hidden');
+            sectionTitle.innerText = "Stock Inventory";
+            navCrops.classList.remove('active');
+            navInventory.classList.add('active');
+            loadInventory();
+        }
+        sessionStorage.setItem("lastTab", tab);
+    }
+
+    // --- SEARCH LOGIC ---
+    function filterCrops() {
+        const term = document.getElementById('searchInput').value.toLowerCase();
+        const cards = document.querySelectorAll('.crop-card');
+        cards.forEach(card => {
+            const text = card.innerText.toLowerCase();
+            card.style.display = text.includes(term) ? "flex" : "none";
+        });
+    }
+
+    // --- CROP FUNCTIONS ---
+    async function loadCrops() {
+        try {
+            const res = await fetch(`${BASE_URL}/api/crops?username=${loggedInUser}`);
+            const crops = await res.json();
+            const grid = document.getElementById('cropGrid');
+            if(crops.length === 0) {
+                grid.innerHTML = '<p style="grid-column: 1/3; text-align:center; padding:20px;">No crops planted yet.</p>';
+                return;
+            }
+            grid.innerHTML = crops.map(crop => `
+                <div class="crop-card" onclick="window.location.href='planner.html?id=${crop.id}&type=${crop.type}'">
+                    <button class="delete-btn" onclick="deleteItem('/api/crops', ${crop.id}, event, loadCrops)">×</button>
+                    <div class="crop-icon-placeholder">${crop.type.charAt(0)}</div>
+                    <strong style="font-size: 13px;">${crop.type}</strong>
+                    <div style="font-size: 11px; color: #888;">${crop.datePlanted}</div>
+                </div>
+            `).join('');
+        } catch (err) { console.error("Error loading crops:", err); }
+    }
+
+    // --- INVENTORY / SUPPLY FUNCTIONS ---
+    async function loadInventory() {
+        try {
+            const res = await fetch(`${BASE_URL}/api/supplies?username=${loggedInUser}`); 
+            if (!res.ok) throw new Error("API Error");
+            const items = await res.json();
+            
+            const list = document.getElementById('inventoryList');
+            if(items.length === 0) {
+                list.innerHTML = '<p style="text-align:center; padding:20px; color:#888;"> No supplies found. Add one below!</p>';
+                return;
+            }
+
+            list.innerHTML = items.map(item => {
+                const safeName = item.brandName.replace(/'/g, "\\'");
+                return `
+                <div class="inventory-card" style="flex-direction: row; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 15px; background: white; border-radius: 15px; text-align: left; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="flex: 1;">
+                        <strong style="font-size: 14px; color: #2e7d32;">${item.brandName}</strong><br>
+                        <span style="font-size: 11px; color: #666;">${item.category} | ${item.weight || 0}${item.unit || ''}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; margin-right: 10px;">
+                        <div style="text-align: center;">
+                            <div style="font-weight: bold; color: #333; font-size: 15px;">${item.stockQuantity}</div>
+                            <div style="font-size: 9px; color: #888; text-transform: uppercase;">Stock</div>
+                        </div>
+                        <button onclick="restockItem(${item.id}, ${item.stockQuantity}, '${safeName}')" 
+                                style="border:none; background:#e3f2fd; color:#1976d2; padding: 6px 10px; border-radius:8px; font-size: 10px; font-weight: bold; cursor:pointer;">
+                            + ADD
+                        </button>
+                    </div>
+                    <button onclick="deleteItem('/api/supplies', ${item.id}, event, loadInventory)" 
+                            style="border:none; background:#ffeded; color:red; border-radius:50%; width:26px; height:26px; cursor:pointer; font-size: 16px;">×</button>
+                </div>`;
+            }).join('');
+        } catch (err) { 
+            document.getElementById('inventoryList').innerHTML = '<p style="text-align:center; color:red;">Cannot connect to Supply API.</p>';
+        }
+    }
+
+    let currentRestockId = null;
+    let currentRestockQty = 0;
+
+    function restockItem(id, currentQty, brandName) {
+        currentRestockId = id;
+        currentRestockQty = currentQty;
+        document.getElementById('restockItemName').innerText = brandName;
+        document.getElementById('restockAmount').value = ""; 
+        document.getElementById('restockModal').style.display = 'flex';
+    }
+
+    async function submitRestock() {
+        const addAmount = document.getElementById('restockAmount').value;
+        if (!addAmount || isNaN(addAmount) || parseFloat(addAmount) <= 0) {
+            alert("Please enter a valid amount.");
+            return;
+        }
+
+        const newTotal = parseFloat(currentRestockQty) + parseFloat(addAmount);
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/supplies/${currentRestockId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stockQuantity: newTotal })
+            });
+
+            if (res.ok) {
+                closeModals();
+                loadInventory(); 
+            } else {
+                alert("Server Error. Make sure Java Controller is updated.");
+            }
+        } catch (err) { alert("Connection lost."); }
+    }
+
+    async function saveSupply() {
+    // 1. Kunin ang values
+    const brand = document.getElementById('supplyBrand').value;
+    const cat = document.getElementById('supplyCategory').value;
+    const weight = document.getElementById('supplyWeight').value;
+    const unit = document.getElementById('supplyUnit').value;
+    const qty = document.getElementById('supplyQty').value;
+
+    // 2. Validation
+    if (!brand || !qty) {
+        alert("Please fill in Brand and Quantity!");
+        return;
+    }
+
+    // 3. Login Check
+    if (!loggedInUser) {
+        alert("Error: No logged in user found.");
+        return;
+    }
+
+    try {
+        console.log("Sending supply for user:", loggedInUser);
+        
+        const res = await fetch(`${BASE_URL}/api/supplies?username=${loggedInUser}`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                brandName: brand,
+                category: cat,
+                weight: parseFloat(weight) || 0,
+                unit: unit,
+                stockQuantity: parseFloat(qty)
+            }) 
+        });
+
+        if (res.ok) { 
+            console.log("Save successful");
+            closeModals(); 
+            loadInventory(); 
+            // Clear inputs
+            document.getElementById('supplyBrand').value = "";
+            document.getElementById('supplyQty').value = "";
+            document.getElementById('supplyWeight').value = "";
+        } else {
+            const errorData = await res.text();
+            alert("Server Error: " + errorData);
+        }
+    } catch (err) { 
+        console.error("Fetch error:", err);
+        alert("Failed to connect to server."); 
+    }
+}   
+    async function saveNewTemplate() {
+    const cropTypeName = document.getElementById('newCropTypeName').value;
+    const taskRows = document.querySelectorAll('#taskInputsContainer .task-row');
+
+    if (!cropTypeName) return alert("Please enter a crop name!");
+
+    let successCount = 0;
+
+    // I-loop ang bawat row para i-save sa backend
+    for (let row of taskRows) {
+        const day = row.querySelectorAll('input')[0].value;
+        const taskName = row.querySelectorAll('input')[1].value;
+
+        if (day && taskName) {
+            try {
+                const res = await fetch(`${BASE_URL}/api/crops/templates`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cropType: cropTypeName,
+                        dayNumber: parseInt(day),
+                        taskName: taskName
+                    })
+                });
+                if (res.ok) successCount++;
+            } catch (err) {
+                console.error("Error saving row:", err);
+            }
+        }
+    }
+
+    if (successCount > 0) {
+        alert(`Successfully saved ${cropTypeName} with ${successCount} tasks!`);
+        closeModals();
+        // I-clear ang inputs
+        document.getElementById('newCropTypeName').value = "";
+        document.getElementById('taskInputsContainer').innerHTML = `
+            <div class="task-row" style="display: flex; gap: 5px; margin-bottom: 8px;">
+                <input type="number" placeholder="Day" style="width: 60px; padding:8px; border-radius:8px; border:1px solid #eee;">
+                <input type="text" placeholder="Task description" style="flex: 1; padding:8px; border-radius:8px; border:1px solid #eee;">
+            </div>`;
+        loadCropTypes(); // Refresh ang dropdown sa kabilang modal
+    } else {
+        alert("Failed to save template. Check console.");
+    }
+}
+    // --- MODAL & HELPERS ---
+    function openCropModal() { document.getElementById('cropModal').style.display = 'flex'; loadCropTypes(); }
+    function openTemplateModal() { document.getElementById('templateModal').style.display = 'flex'; }
+    function openSupplyModal() { document.getElementById('supplyModal').style.display = 'flex'; }
+    function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+
+    async function loadCropTypes() {
+        try {
+            const res = await fetch(`${BASE_URL}/api/crops/templates/types`);
+            const types = await res.json();
+            const select = document.getElementById('cropType');
+            select.innerHTML = types.map(t => `<option value="${t}">${t}</option>`).join('');
+        } catch (err) { console.error("Type load fail"); }
+    }
+
+    async function saveCrop() {
+        const type = document.getElementById('cropType').value;
+        const qty = document.getElementById('quantity').value;
+        const date = document.getElementById('datePlanted').value;
+        if (!type || !qty || !date) return alert("Fill all fields");
+
+        const res = await fetch(`${BASE_URL}/api/crops?username=${loggedInUser}`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ type, quantity: parseInt(qty), datePlanted: date }) 
+        });
+        if (res.ok) { closeModals(); loadCrops(); }
+    }
+
+async function deleteItem(ep, id, ev, cb) {
+    ev.stopPropagation(); // Pigilan ang pagbukas ng card/planner
+
+    if (!confirm("Are you sure you want to delete this item?")) return;
+
+    try {
+        const res = await fetch(`${BASE_URL}${ep}/${id}`, { 
+            method: 'DELETE' 
+        });
+
+        if (res.ok) {
+            alert("Deleted successfully!");
+            cb(); // I-refresh ang listahan (loadCrops or loadInventory)
+        } else {
+            // Dito papasok yung 500 error details
+            const errorData = await res.json().catch(() => ({}));
+            alert(`Delete failed: ${errorData.message || 'Server Error (Check Foreign Keys)'}`);
+        }
+    } catch (err) {
+        console.error("Delete Error:", err);
+        alert("Cannot connect to server.");
+    }
+}
+
+    function addTaskRow() {
+        const container = document.getElementById('taskInputsContainer');
+        const div = document.createElement('div');
+        div.className = 'task-row';
+        div.style.display = 'flex'; div.style.gap = '5px'; div.style.marginBottom = '8px';
+        div.innerHTML = `<input type="number" placeholder="Day" style="width: 60px; padding:8px; border-radius:8px; border:1px solid #eee;"><input type="text" placeholder="Task description" style="flex: 1; padding:8px; border-radius:8px; border:1px solid #eee;">`;
+        container.appendChild(div);
+    }
+
+    window.onload = () => {
+        const lastTab = sessionStorage.getItem("lastTab") || "crops";
+        switchTab(lastTab);
+    };
+</script>
+</body>
+</html>

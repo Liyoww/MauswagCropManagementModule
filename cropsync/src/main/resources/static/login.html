@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - CropTrack</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #76b852; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: white; padding: 40px; border-radius: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 85%; max-width: 350px; text-align: center; }
+        h2 { color: #2e7d32; margin-bottom: 30px; }
+        input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; font-size: 16px; }
+        .btn-login { background: #4CAF50; color: white; border: none; width: 100%; padding: 15px; border-radius: 15px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .error-msg { color: red; font-size: 14px; margin-bottom: 15px; display: none; }
+        .signup-link {
+            display: block;
+            margin-top: 20px;
+            color: #666;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s ease; /* Para smooth ang transition */
+        }
+
+        .signup-link:hover {
+            color: #2e7d32;      /* Magiging green pag na-hover */
+            font-weight: bold;   /* Mag-bo-bold ng konti */
+            text-decoration: underline; /* Lalabas ang underline */
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2>CropTrack Login</h2>
+    <div id="error" class="error-msg">Maling username o password!</div>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button class="btn-login" onclick="handleLogin()">Login</button>
+    <a href="signup.html" class="signup-link">Don't have account yet? Sign up here.</a>
+</div>
+
+<script>
+    if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registered!', reg))
+        .catch(err => console.log('Service Worker registration failed: ', err));
+    });
+  }
+    // Kung logged in na, diretso na sa Dashboard (Para iwas pitik)
+    if (localStorage.getItem("isLoggedIn") === "true") {
+        window.location.href = "index.html";
+    }
+
+    function handleLogin() {
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+        const error = document.getElementById('error');
+
+        // Simple check muna: admin / admin
+        if (user === "admin" && pass === "admin") {
+            localStorage.setItem("isLoggedIn", "true"); // ETO YUNG SUSI
+            window.location.href = "index.html";
+        } else {
+            error.style.display = "block";
+            // Shake effect pag mali
+            document.querySelector('.login-card').animate([
+                { transform: 'translateX(0)' },
+                { transform: 'translateX(-10px)' },
+                { transform: 'translateX(10px)' },
+                { transform: 'translateX(0)' }
+            ], { duration: 200 });
+        }
+    }
+    async function handleLogin() {
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+        const error = document.getElementById('error');
+        const BASE_URL = "https://teresia-aprioristic-unspasmodically.ngrok-free.dev";
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+
+            if (res.ok) {
+            localStorage.setItem("isLoggedIn", "true");
+            localStorage.setItem("username", user); 
+            window.location.href = "index.html";
+            } else {
+                // Show error message
+                error.style.display = "block";
+                // Shake effect
+                document.querySelector('.login-card').animate([
+                    { transform: 'translateX(0)' },
+                    { transform: 'translateX(-10px)' },
+                    { transform: 'translateX(10px)' },
+                    { transform: 'translateX(0)' }
+                ], { duration: 200 });
+            }
+        } catch (err) {
+            alert("Backend is offline. Check ngrok.");
+        }
+    }
+</script>
+
+</body>
+</html>

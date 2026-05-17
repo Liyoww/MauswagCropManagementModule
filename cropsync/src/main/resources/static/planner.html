@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Crop Planner</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; color: #333; overflow-x: hidden; }
+        .header { background: #76b852; color: white; padding: 20px; display: flex; align-items: center; gap: 15px; }
+        .back-btn { background: none; border: 1px solid white; color: white; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+        
+        .tabs { display: flex; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100; }
+        .tab { flex: 1; text-align: center; padding: 15px; cursor: pointer; color: #888; border-bottom: 3px solid transparent; font-weight: bold; font-size: 14px; }
+        .tab.active { color: #2e7d32; border-bottom: 3px solid #2e7d32; }
+
+        .container { padding: 15px; max-width: 100%; margin: auto; padding-bottom: 50px; box-sizing: border-box; }
+        
+        /* --- FIXED CARD LOGIC --- */
+            .card { 
+            background: white; 
+            border-radius: 15px; 
+            padding: 15px; 
+            margin-bottom: 12px; 
+            display: flex;             /* Flex layout */
+            align-items: flex-start;   /* Checkbox sa top-aligned */
+            gap: 15px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            width: 100%;               /* Sakop ang buong screen */
+            box-sizing: border-box; 
+            overflow: hidden;          /* Pigilan ang paglapad ng card */
+        }
+
+        .task-checkbox { 
+            width: 20px;               /* Fixed width para sa checkbox */
+            height: 20px;
+            transform: scale(1.3); 
+            accent-color: #4CAF50; 
+            margin-top: 2px;
+            flex-shrink: 0;            /* Hindi dapat lumiliit ang checkbox */
+        }
+
+        .task-text {
+            flex-grow: 1;              /* Ito ang kukuha ng space */
+            width: 0;                  /* MAGIC TRICK: Pinupuwersa ang browser na i-calculate ang wrap */
+            display: block;            /* Balik sa normal block display */
+            text-align: left;
+        }
+
+        .task-title {
+            font-weight: bold; 
+            font-size: 15px; 
+            color: #333;
+            line-height: 1.4;
+            word-wrap: break-word;     /* Bababa ang text pag mahaba */
+            overflow-wrap: break-word;
+            display: block;            /* Siguradong block element */
+            width: 100%;
+        }
+
+        .task-sub { 
+            font-size: 11px; 
+            color: #999; 
+            margin-top: 4px; 
+            display: block;
+        }
+        
+        .completed-text { text-decoration: line-through; color: #aaa !important; }
+        /* Input Section Styles */
+        .section-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid #76b852; }
+        .section-title { color: #2e7d32; font-weight: bold; display: block; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        label { display: block; font-size: 12px; margin-bottom: 5px; color: #666; font-weight: bold; }
+        select, input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-family: inherit; font-size: 16px; /* 16px prevents iOS zoom on focus */ background: #fafafa; }
+        
+        .btn-action { width: 100%; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; }
+        .btn-weather { background: #e3f2fd; color: #1976d2; }
+        .btn-supply { background: #e8f5e9; color: #2e7d32; }
+        .btn-notes { background: #fff3e0; color: #ef6c00; }
+        .btn-action:active { transform: scale(0.96); opacity: 0.8; }
+
+        .log-item { border-left: 3px solid #ddd; padding-left: 10px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <button class="back-btn" onclick="location.href='index.html'">←</button>
+        <h3 id="cropTitle" style="margin: 0; font-size: 18px;">Planner</h3>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" id="tabTasks" onclick="switchTab('tasks')">TASKS</div>
+        <div class="tab" id="tabInputs" onclick="switchTab('inputs')">FARM INPUTS</div>
+    </div>
+
+    <div class="container">
+        <div id="mainContent">
+            <div style="text-align:center; padding:50px; color:#888;">Initializing...</div>
+        </div>
+    </div>
+
+   <script>
+    const BASE_URL = "https://teresia-aprioristic-unspasmodically.ngrok-free.dev";
+    const loggedInUser = localStorage.getItem("username");
+    const urlParams = new URLSearchParams(window.location.search);
+    const cropId = urlParams.get('id');
+    const cropType = urlParams.get('type');
+    let currentTab = 'tasks';
+
+    window.onload = () => {
+        if (!cropId) { window.location.href = 'index.html'; return; }
+        document.getElementById('cropTitle').innerText = `${cropType || 'Crop'} Planner`;
+        loadTasks(); 
+    };
+
+    function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    if (tab === 'tasks') {
+        document.getElementById('tabTasks').classList.add('active');
+        loadTasks();
+    } else {
+        document.getElementById('tabInputs').classList.add('active');
+        renderInputsView();
+        // Siguraduhin na tinatawag ang dropdown load dito (nasa loob na ng renderInputsView pero double check)
+    }
+}
+
+   async function loadTasks() {
+    const content = document.getElementById('mainContent');
+    content.innerHTML = "<div style='text-align:center; padding:20px;'>Syncing tasks...</div>";
+    
+    try {
+        // 1. Kunin ang tasks (Dito na natin kunin lahat, wag na tayo tumawag sa /api/crops para iwas 400 error)
+        const response = await fetch(`${BASE_URL}/api/crops/${cropId}/tasks`);
+        if (!response.ok) throw new Error("Failed to fetch tasks");
+        
+        const tasks = await response.json();
+        
+        if (!tasks || tasks.length === 0) {
+            content.innerHTML = `
+                <div style='text-align:center; color:#999; margin-top:50px;'>
+                    <div style="font-size:40px; margin-bottom:10px;">✓</div>
+                    <p>No pending tasks.</p>
+                </div>`;
+            return;
+        }
+
+        content.innerHTML = tasks.map(task => {
+            // Gamitin natin ang logic na galing mismo sa Java mo
+            // Kung ang description ay may "[LOCKED]", ibig sabihin hindi pa siya pwede
+            const isLocked = task.description.includes("[LOCKED]");
+            const displayDesc = task.description.replace("[LOCKED] ", "");
+
+            return `
+                <div class="card" style="${isLocked ? 'opacity: 0.6; background: #f5f5f5; pointer-events: none;' : ''}">
+                    ${isLocked 
+                        ? `<div style="font-size: 18px; margin-top: 2px;">🔒</div>` 
+                        : `<input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})">`
+                    }
+                    <div class="task-text">
+                        <span class="task-title ${task.completed ? 'completed-text' : ''}">
+                            ${displayDesc}
+                        </span>
+                        <div class="task-sub">
+                            ${isLocked ? "Future Task" : "Ready to perform"} — Day ${task.dayOffset}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) { 
+        console.error("Task Error:", err);
+        content.innerHTML = "<p style='color:red; text-align:center;'>Unable to load tasks. Check connection.</p>"; 
+    }
+}
+    async function toggleTask(taskId) {
+        try {
+            const res = await fetch(`${BASE_URL}/api/crops/tasks/${taskId}/toggle`, { method: 'PUT' });
+            if(res.ok) loadTasks();
+        } catch (err) { alert("Failed to update task."); }
+    }
+
+    function renderInputsView() {
+        const content = document.getElementById('mainContent');
+        content.innerHTML = `
+            <div class="section-card">
+                <span class="section-title">Daily Weather</span>
+                <select id="weatherSelect">
+                    <option value="Sunny">Sunny / Clear</option>
+                    <option value="Cloudy">Cloudy</option>
+                    <option value="Rainy">Rainy</option>
+                    <option value="Stormy">Stormy / Heavy Rain</option>
+                </select>
+                <button class="btn-action btn-weather" onclick="saveData('weather')">Update Weather</button>
+            </div>
+
+            <div class="section-card">
+                <span class="section-title">Farm Supplies</span>
+                <label>Select Item from Inventory:</label>
+                <select id="supplySelect"><option>Loading Inventory...</option></select>
+                <label>Quantity Used:</label>
+                <input type="number" id="matQty" placeholder="0.00">
+                <button class="btn-action btn-supply" onclick="saveData('supply')">Apply & Deduct Stock</button>
+            </div>
+
+            <div class="section-card">
+                <span class="section-title">Field Remarks</span>
+                <textarea id="remarksInput" rows="2" placeholder="Example: Pest observed..."></textarea>
+                <button class="btn-action btn-notes" onclick="saveData('notes')">Save Note</button>
+            </div>
+
+            <div style="margin: 25px 0 10px; font-size: 12px; font-weight: bold; color: #777; text-transform: uppercase;">Activity Log (Today)</div>
+            <div id="inputsList">Loading logs...</div>
+        `;
+        loadSupplyDropdown();
+        loadInputsList();
+    }
+
+   async function loadSupplyDropdown() {
+    const select = document.getElementById('supplySelect');
+    if (!select) return;
+
+    const user = localStorage.getItem("username"); 
+
+    try {
+        const res = await fetch(`${BASE_URL}/api/supplies?username=${user}`);
+        
+        if (!res.ok) throw new Error("Failed to fetch supplies");
+
+        const supplies = await res.json();
+        console.log("Supplies loaded:", supplies); 
+
+        if (supplies.length === 0) {
+            select.innerHTML = '<option value="">No supplies in inventory</option>';
+        } else {
+            // DITO NA-FIX: Binubuo ang dropdown list
+            let options = '<option value="">-- Choose Brand --</option>';
+            options += supplies.map(s => 
+                `<option value="${s.id}">${s.brandName} (${s.stockQuantity} ${s.unit || ''} left)</option>`
+            ).join('');
+            select.innerHTML = options;
+        }
+    } catch(e) { 
+        console.error("Dropdown Error:", e);
+        select.innerHTML = '<option>Error loading inventory</option>'; 
+    }
+}
+    async function loadInputsList() {
+    const listDiv = document.getElementById('inputsList');
+    
+    // Kunin ang local date (YYYY-MM-DD)
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const todayStr = (new Date(now - offset)).toISOString().split('T')[0];
+    
+    try {
+        const res = await fetch(`${BASE_URL}/api/crops/${cropId}/inputs`);
+        const all = await res.json();
+        
+        // I-filter ang activities na para sa araw na ito lang
+        const today = all.filter(item => {
+            // Minsan ang date sa DB ay '2023-10-27 10:00:00', kailangan lang natin ang Date part
+            const itemDate = item.dateApplied.split(' ')[0] || item.dateApplied;
+            return itemDate === todayStr;
+        });
+
+        if (today.length === 0) {
+            listDiv.innerHTML = `<p style='text-align:center; color:#bbb; font-size:13px; margin-top:20px;'>
+                                 No activities recorded today (${todayStr}).</p>`;
+            return;
+        }
+
+        listDiv.innerHTML = today.reverse().map(item => {
+    // 1. Check if supply exists, then brandName
+    const supplyName = (item.supply && item.supply.brandName) ? item.supply.brandName : 'Field Activity';
+    
+    // 2. Check if unit exists
+    const unit = (item.supply && item.supply.unit) ? item.supply.unit : '';
+    
+    // 3. Format quantity
+    const qtyText = (item.quantityUsed) ? `-${item.quantityUsed} ${unit}` : '';
+
+    return `
+        <div class="card" style="...">
+            <div style="display:flex; justify-content: space-between; width: 100%;">
+                <span style="font-weight:bold;">${supplyName}</span>
+                <span style="color:red; font-weight:bold;">${qtyText}</span>
+            </div>
+            <div style="font-size:11px; color:#666;">
+                ${item.weather ? `${item.weather}` : ''} 
+                ${item.remarks ? `<br> ${item.remarks}` : ''}
+            </div>
+        </div>
+    `;
+}).join('');
+    } catch (err) { 
+        console.error(err);
+        listDiv.innerHTML = "Error loading logs."; 
+    }
+}
+
+    async function saveData(type) {
+    let data = { 
+        cropId: parseInt(cropId), 
+        supply: null, 
+        quantityUsed: null, 
+        weather: null, 
+        remarks: null 
+    };
+
+    if (type === 'weather') {
+        data.weather = document.getElementById('weatherSelect').value;
+    } else if (type === 'supply') {
+        const sId = document.getElementById('supplySelect').value;
+        const qty = document.getElementById('matQty').value;
+        
+        if (!sId || !qty) return alert("Pumili ng supply at ilagay ang quantity!");
+        
+        // DAPAT GANITO ANG STRUCTURE PARA MA-MAP SA SUPPLY OBJECT NG JAVA
+        data.supply = { id: parseInt(sId) }; 
+        data.quantityUsed = parseFloat(qty);
+    } else if (type === 'notes') {
+        const note = document.getElementById('remarksInput').value;
+        if (!note) return alert("Mag-input muna ng remarks!");
+        data.remarks = note;
+    }
+
+    try {
+        const res = await fetch(`${BASE_URL}/api/crops/${cropId}/inputs`, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            // Clear inputs
+            if (type === 'notes') document.getElementById('remarksInput').value = '';
+            if (type === 'supply') document.getElementById('matQty').value = '';
+            
+            // Refresh list and dropdown
+            loadInputsList();
+            loadSupplyDropdown(); 
+            alert("Record saved!");
+        } else {
+            const errorText = await res.text();
+            alert("Error: " + errorText);
+        }
+    } catch (e) { 
+        alert("Server connection lost."); 
+    }
+}
+</script>
+</body>
+</html>
